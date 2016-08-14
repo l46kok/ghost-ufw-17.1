@@ -33,12 +33,14 @@
 #include "map.h"
 #include "packed.h"
 #include "savegame.h"
+#include "fate_ranking_system.h"
 #include "gameplayer.h"
 #include "gameprotocol.h"
 #include "gpsprotocol.h"
 #include "game_base.h"
 #include "game.h"
 #include "game_admin.h"
+
 
 #include <signal.h>
 #include <stdlib.h>
@@ -395,13 +397,13 @@ CGHost :: CGHost( CConfig *CFG )
 	m_UDPSocket->SetBroadcastTarget( CFG->GetString( "udp_broadcasttarget", string( ) ) );
 	m_UDPSocket->SetDontRoute( CFG->GetInt( "udp_dontroute", 0 ) == 0 ? false : true );
 	m_ReconnectSocket = NULL;
-	m_FRSSocket = NULL;
-	m_FRSClientSocket = NULL;
+	
 	m_GPSProtocol = new CGPSProtocol( );
 	m_CRC = new CCRC32( );
 	m_CRC->Initialize( );
 	m_SHA = new CSHA1( );
 	m_CurrentGame = NULL;
+	m_frs = NULL;
 	string DBType = CFG->GetString( "db_type", "sqlite3" );
 	CONSOLE_Print( "[GHOST] opening primary database" );
 
@@ -509,7 +511,6 @@ CGHost :: CGHost( CConfig *CFG )
 	m_Reconnect = CFG->GetInt( "bot_reconnect", 1 ) == 0 ? false : true;
 	m_ReconnectPort = CFG->GetInt( "bot_reconnectport", 6114 );
 	m_FRSPort = CFG->GetInt("bot_frsport", 6302);
-	m_FRSConnect = true;
 	m_DefaultMap = CFG->GetString( "bot_defaultmap", "map" );
 	m_AdminGameCreate = CFG->GetInt( "admingame_create", 0 ) == 0 ? false : true;
 	m_AdminGamePort = CFG->GetInt( "admingame_port", 6113 );
@@ -664,6 +665,7 @@ CGHost :: CGHost( CConfig *CFG )
 
 	m_AutoHostMap = new CMap( *m_Map );
 	m_SaveGame = new CSaveGame( );
+	m_frs = new FRS(this, m_FRSPort, m_BindAddress);
 
 	// load the iptocountry data
 
@@ -696,8 +698,6 @@ CGHost :: ~CGHost( )
 {
 	delete m_UDPSocket;
 	delete m_ReconnectSocket;
-	delete m_FRSSocket;
-	delete m_FRSClientSocket;
 
 	for( vector<CTCPSocket *> :: iterator i = m_ReconnectSockets.begin( ); i != m_ReconnectSockets.end( ); i++ )
 		delete *i;
@@ -711,6 +711,7 @@ CGHost :: ~CGHost( )
 
 	delete m_CurrentGame;
 	delete m_AdminGame;
+	delete m_frs;
 
 	for( vector<CBaseGame *> :: iterator i = m_Games.begin( ); i != m_Games.end( ); i++ )
 		delete *i;
@@ -843,31 +844,6 @@ bool CGHost :: Update( long usecBlock )
 		}
 	}
 
-	// create fate ranking system listener
-	if (m_FRSConnect)
-	{
-		if (!m_FRSSocket)
-		{
-			m_FRSSocket = new CTCPServer();
-			if (m_FRSSocket->Listen(m_BindAddress, m_FRSPort))
-				CONSOLE_Print( "[FRS] listening for Fate Ranking System on port " + UTIL_ToString( m_FRSPort ) );
-			else
-			{
-				CONSOLE_Print( "[FRS] error listening for Fate Ranking System on port " + UTIL_ToString( m_FRSPort ) );
-				delete m_FRSSocket;
-				m_FRSSocket = NULL;
-				m_FRSConnect = false;
-			}
-		}
-		else if( m_ReconnectSocket->HasError( ) )
-		{
-			CONSOLE_Print( "[FRS] Fate Ranking System listener error (" + m_ReconnectSocket->GetErrorString( ) + ")" );
-			delete m_FRSSocket;
-			m_FRSSocket = NULL;
-			m_FRSConnect = false;
-		}
-	}
-
 
 	unsigned int NumFDs = 0;
 
@@ -916,18 +892,10 @@ bool CGHost :: Update( long usecBlock )
 
 	// 6. Fate Ranking System sockets
 
-	if ( m_FRSConnect && m_FRSSocket )
+	if (m_frs)
 	{
-		m_FRSSocket->SetFD( &fd, &send_fd, &nfds );
-		NumFDs++;
+		NumFDs += m_frs->SetFD(&fd,&send_fd,&nfds);
 	}
-
-	if (m_FRSClientSocket)
-	{
-		m_FRSClientSocket->SetFD(&fd,&send_fd,&nfds);
-		NumFDs++;
-	}
-
 
 	// before we call select we need to determine how long to block for
 	// previously we just blocked for a maximum of the passed usecBlock microseconds
@@ -1046,44 +1014,49 @@ bool CGHost :: Update( long usecBlock )
 			m_ReconnectSockets.push_back( NewSocket );
 	}
 
-	if ( m_FRSConnect && m_FRSSocket )
+	if (m_frs)
 	{
-		CTCPSocket *NewSocket = m_FRSSocket->Accept(&fd);
-		
-		if (m_FRSClientSocket)
-		{
-			if (m_FRSClientSocket->HasError() || !m_FRSClientSocket->GetConnected())
-			{
-				delete m_FRSClientSocket;
-				m_FRSClientSocket = NULL;
-			}
-			else
-			{
-				m_FRSClientSocket->DoRecv(&fd);
-				string RecvBuffer = *(m_FRSClientSocket->GetBytes());
-				if (!RecvBuffer.empty())
-				{
-					CONSOLE_Print( "[FRS] RecvBuffer " + RecvBuffer );
-					if (gGHost->m_CurrentGame)
-					{
-						
-						CONSOLE_Print(gGHost->m_CurrentGame->GetDescription( ));
-					}
-					else
-					{
-						CONSOLE_Print("No game in lobby");
-					}
-						
-				}
-				m_FRSClientSocket->ClearRecvBuffer();
-			}
-		}
-
-		if ( NewSocket )
-		{
-			m_FRSClientSocket = NewSocket;
-		}
+		m_frs->Update(&fd,&send_fd);
 	}
+
+	//if ( m_FRSConnect && m_FRSSocket )
+	//{
+	//	//CTCPSocket *NewSocket = m_FRSSocket->Accept(&fd);
+	//	//
+	//	//if (m_FRSClientSocket)
+	//	//{
+	//	//	if (m_FRSClientSocket->HasError() || !m_FRSClientSocket->GetConnected())
+	//	//	{
+	//	//		delete m_FRSClientSocket;
+	//	//		m_FRSClientSocket = NULL;
+	//	//	}
+	//	//	else
+	//	//	{
+	//	//		m_FRSClientSocket->DoRecv(&fd);
+	//	//		string RecvBuffer = *(m_FRSClientSocket->GetBytes());
+	//	//		if (!RecvBuffer.empty())
+	//	//		{
+	//	//			CONSOLE_Print( "[FRS] RecvBuffer " + RecvBuffer );
+	//	//			if (gGHost->m_CurrentGame)
+	//	//			{
+	//	//				
+	//	//				CONSOLE_Print(gGHost->m_CurrentGame->GetDescription( ));
+	//	//			}
+	//	//			else
+	//	//			{
+	//	//				CONSOLE_Print("No game in lobby");
+	//	//			}
+	//	//				
+	//	//		}
+	//	//		m_FRSClientSocket->ClearRecvBuffer();
+	//	//	}
+	//	//}
+
+	//	//if ( NewSocket )
+	//	//{
+	//	//	m_FRSClientSocket = NewSocket;
+	//	//}
+	//}
 
 
 	for( vector<CTCPSocket *> :: iterator i = m_ReconnectSockets.begin( ); i != m_ReconnectSockets.end( ); )

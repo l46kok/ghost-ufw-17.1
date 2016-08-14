@@ -162,8 +162,11 @@ public:
 	virtual uint32_t GetNextTimedActionTicks( );
 	virtual uint32_t GetSlotsOccupied( );
 	virtual uint32_t GetSlotsOpen( );
+	virtual uint32_t GetSlots( );
 	virtual uint32_t GetNumPlayers( );
 	virtual uint32_t GetNumHumanPlayers( );
+	virtual uint32_t GetStartPlayers( );
+	virtual uint32_t GetGameDuration( );
 	virtual string GetDescription( );
 
 	virtual void SetAnnounce( uint32_t interval, string message );

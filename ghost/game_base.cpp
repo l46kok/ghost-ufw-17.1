@@ -301,6 +301,11 @@ uint32_t CBaseGame :: GetSlotsOpen( )
 	return NumSlotsOpen;
 }
 
+uint32_t CBaseGame :: GetSlots( )
+{
+	return m_Slots.size();
+}
+
 uint32_t CBaseGame :: GetNumPlayers( )
 {
 	uint32_t NumPlayers = GetNumHumanPlayers( );
@@ -324,6 +329,11 @@ uint32_t CBaseGame :: GetNumHumanPlayers( )
 	return NumHumanPlayers;
 }
 
+uint32_t CBaseGame :: GetStartPlayers( )
+{
+	return m_StartPlayers;
+}
+
 string CBaseGame :: GetDescription( )
 {
 	string Description = m_GameName + " : " + m_OwnerName + " : " + UTIL_ToString( GetNumHumanPlayers( ) ) + "/" + UTIL_ToString( m_GameLoading || m_GameLoaded ? m_StartPlayers : m_Slots.size( ) );
@@ -334,6 +344,13 @@ string CBaseGame :: GetDescription( )
 		Description += " : " + UTIL_ToString( ( GetTime( ) - m_CreationTime ) / 60 ) + "m";
 
 	return Description;
+}
+
+uint32_t CBaseGame :: GetGameDuration()
+{
+	if( m_GameLoading || m_GameLoaded )
+		return ( ( m_GameTicks / 1000 ) / 60 );
+	return 0;
 }
 
 void CBaseGame :: SetAnnounce( uint32_t interval, string message )

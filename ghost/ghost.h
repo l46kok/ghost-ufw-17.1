@@ -42,14 +42,13 @@ class CLanguage;
 class CMap;
 class CSaveGame;
 class CConfig;
+class FRS;
 
 class CGHost
 {
 public:
 	CUDPSocket *m_UDPSocket;				// a UDP socket for sending broadcasts and other junk (used with !sendlan)
 	CTCPServer *m_ReconnectSocket;			// listening socket for GProxy++ reliable reconnects
-	CTCPServer *m_FRSSocket;				// listening socket for Fate Ranking System (ufwfate.net)
-	CTCPSocket *m_FRSClientSocket;			// Fate Ranking System socket for connected client
 	vector<CTCPSocket *> m_ReconnectSockets;// vector of sockets attempting to reconnect (connected but not identified yet)
 	CGPSProtocol *m_GPSProtocol;
 	CCRC32 *m_CRC;							// for calculating CRC's
@@ -57,6 +56,7 @@ public:
 	vector<CBNET *> m_BNETs;				// all our battle.net connections (there can be more than one)
 	CBaseGame *m_CurrentGame;				// this game is still in the lobby state
 	CAdminGame *m_AdminGame;				// this "fake game" allows an admin who knows the password to control the bot from the local network
+	FRS *m_frs;
 	vector<CBaseGame *> m_Games;			// these games are in progress
 	CGHostDB *m_DB;							// database
 	CGHostDB *m_DBLocal;					// local database (for temporary data)
@@ -90,7 +90,6 @@ public:
 	string m_BindAddress;					// config value: the address to host games on
 	uint16_t m_HostPort;					// config value: the port to host games on
 	bool m_Reconnect;						// config value: GProxy++ reliable reconnects enabled or not
-	bool m_FRSConnect;						// config value: flag for FRS connection
 	uint16_t m_ReconnectPort;				// config value: the port to listen for GProxy++ reliable reconnects on
 	uint16_t m_FRSPort;						// config value: the port to listen for Fate Ranking System
 	uint32_t m_ReconnectWaitTime;			// config value: the maximum number of minutes to wait for a GProxy++ reliable reconnect

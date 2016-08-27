@@ -91,7 +91,6 @@ bool FRS :: Update( void *fd, void *send_fd )
 				ptree lobbyPt;
 				ptree progressArrPt;
 				std::stringstream ss;
-				CONSOLE_Print( "[FRS] RecvBuffer: " + RecvBuffer );
 				
 				if (RecvBuffer == "GetGames")
 				{
@@ -111,7 +110,7 @@ bool FRS :: Update( void *fd, void *send_fd )
 					for (unsigned int i = 0; i < m_GHost->m_Games.size( ); i++)
 					{
 						ptree progressPt;
-						progressPt.put("GameNumber",i);
+						progressPt.put("GameNumber",i+1);
 						progressPt.put("PlayerCount",m_GHost->m_Games[i]->GetNumHumanPlayers());
 						progressPt.put("SlotSize",m_GHost->m_Games[i]->GetStartPlayers());
 						progressPt.put("GameName",m_GHost->m_Games[i]->GetGameName());

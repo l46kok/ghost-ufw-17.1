@@ -271,7 +271,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="..\bncsutil\src;..\StormLib;..\zlib\include;..\mysql\include"
+				AdditionalIncludeDirectories="..\bncsutil\src;D:\SourceCodes\Personal\boost_1_38_0;..\StormLib;..\zlib\include;..\mysql\include"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;GHOST_MYSQL"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"

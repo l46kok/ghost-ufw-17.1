@@ -516,7 +516,7 @@ CGHost :: CGHost( CConfig *CFG )
 	m_AdminGamePort = CFG->GetInt( "admingame_port", 6113 );
 	m_AdminGamePassword = CFG->GetString( "admingame_password", string( ) );
 	m_AdminGameMap = CFG->GetString( "admingame_map", string( ) );
-	m_LANWar3Version = CFG->GetInt( "lan_war3version", 24 );
+	m_LANWar3Version = CFG->GetInt( "lan_war3version", 26 );
 	m_ReplayWar3Version = CFG->GetInt( "replay_war3version", 24 );
 	m_ReplayBuildNumber = CFG->GetInt( "replay_buildnumber", 6059 );
 	SetConfigs( CFG );

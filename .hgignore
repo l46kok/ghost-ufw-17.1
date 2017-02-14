@@ -1,5 +1,18 @@
 syntax: glob
 *.suo
 Debug MySQL/**
+Debug/**
 *.ncb
 *.pch
+*.obj
+ghost/Release/vc90.pdb
+ghost/Release/vc90.idb
+bncsutil/vc8_build/Release/BNCSutil.dll
+bncsutil/vc8_build/Release/BNCSutil.dll.intermediate.manifest
+bncsutil/vc8_build/Release/BNCSutil.exp
+bncsutil/vc8_build/Release/BNCSutil.lib
+bncsutil/vc8_build/Release/BuildLog.htm
+bncsutil/vc8_build/Release/mt.dep
+bncsutil/vc8_build/Release/vc90.idb
+bncsutil/vc8_build/Release/vc90.pdb
+ghost/Release/BuildLog.htm

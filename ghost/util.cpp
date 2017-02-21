@@ -653,6 +653,21 @@ vector<string> UTIL_Tokenize( string s, char delim )
 	return Tokens;
 }
 
+vector<string> UTIL_SplitString(string s, string delimiter) {
+	size_t pos = 0;
+	string token;
+	vector<string> splitStr;
+	while ((pos = s.find(delimiter)) != std::string::npos) {
+		token = s.substr(0, pos);
+		if (!token.empty())
+			splitStr.push_back(token);
+		s.erase(0, pos + delimiter.length());
+	}
+	splitStr.push_back(s);
+	return splitStr;
+}
+
+
 uint32_t UTIL_Factorial( uint32_t x )
 {
 	uint32_t Factorial = 1;

@@ -78,6 +78,11 @@ protected:
 	string m_StatString;							// the stat string when the game started (used when saving replays)
 	string m_KickVotePlayer;						// the player to be kicked with the currently running kick vote
 	string m_HCLCommandString;						// the "HostBot Command Library" command string, used to pass a limited amount of data to specially designed maps
+	map<string, string> m_FRSEventInfoList;			// Fate / Another use only. Contains information about injected info
+	map<string, bool> m_FRSEventHandled;			// Fate / Another use only. Contains if the event id has been handled
+	map<uint32_t, uint32_t> m_FRSKills;				// Fate / Another use only. Contains information about player kills
+	map<uint32_t, uint32_t> m_FRSDeaths;			// Fate / Another use only. Contains information about player kills
+	map<uint32_t, uint32_t> m_FRSAssists;			// Fate / Another use only. Contains information about player kills
 	uint32_t m_RandomSeed;							// the random seed sent to the Warcraft III clients
 	uint32_t m_HostCounter;							// a unique game number
 	uint32_t m_Latency;								// the number of ms to wait between sending action packets (we queue any received during this time)
@@ -125,6 +130,9 @@ protected:
 	bool m_MatchMaking;								// if matchmaking mode is enabled
 	bool m_LocalAdminMessages;						// if local admin messages should be relayed or not
 
+private:
+	virtual void HandleFRSEventInjection(CIncomingAction *action);
+
 public:
 	CBaseGame( CGHost *nGHost, CMap *nMap, CSaveGame *nSaveGame, uint16_t nHostPort, unsigned char nGameState, string nGameName, string nOwnerName, string nCreatorName, string nCreatorServer );
 	virtual ~CBaseGame( );
@@ -141,6 +149,10 @@ public:
 	virtual string GetOwnerName( )					{ return m_OwnerName; }
 	virtual string GetCreatorName( )				{ return m_CreatorName; }
 	virtual string GetCreatorServer( )				{ return m_CreatorServer; }
+	virtual map<string,string> GetFRSEventInfo( )	{ return m_FRSEventInfoList; }
+	virtual map<uint32_t, uint32_t> GetFRSKills( )	{ return m_FRSKills; }
+	virtual map<uint32_t, uint32_t> GetFRSDeaths( )	{ return m_FRSDeaths; }
+	virtual map<uint32_t, uint32_t> GetFRSAssists()	{ return m_FRSAssists; }
 	virtual uint32_t GetHostCounter( )				{ return m_HostCounter; }
 	virtual uint32_t GetLastLagScreenTime( )		{ return m_LastLagScreenTime; }
 	virtual bool GetLocked( )						{ return m_Locked; }
@@ -168,6 +180,7 @@ public:
 	virtual uint32_t GetStartPlayers( );
 	virtual uint32_t GetGameDuration( );
 	virtual string GetDescription( );
+	virtual vector<CGamePlayer *> GetGamePlayers( );
 
 	virtual void SetAnnounce( uint32_t interval, string message );
 

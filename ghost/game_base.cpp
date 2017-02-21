@@ -329,6 +329,11 @@ uint32_t CBaseGame :: GetNumHumanPlayers( )
 	return NumHumanPlayers;
 }
 
+vector<CGamePlayer *> CBaseGame:: GetGamePlayers( ) 
+{
+	return m_Players;
+}
+
 uint32_t CBaseGame :: GetStartPlayers( )
 {
 	return m_StartPlayers;
@@ -1257,6 +1262,132 @@ void CBaseGame :: SendFakePlayerInfo( CGamePlayer *player )
 	Send( player, m_Protocol->SEND_W3GS_PLAYERINFO( m_FakePlayerPID, "FakePlayer", IP, IP ) );
 }
 
+void CBaseGame :: HandleFRSEventInjection(CIncomingAction *action)
+{
+	BYTEARRAY *bytes = action->GetAction();
+	if(std::find(bytes->begin(), bytes->end(), 0x70) == bytes->end()) {
+		return;
+	}
+
+	string injectedEventFull = string(bytes->begin(),bytes->end());
+
+	//if (injectedEventFull.find("SS") >= 0) {
+	//	CONSOLE_Print("[FRS] Event: " + injectedEventFull);
+	//}
+
+	string eventKey = "pa" + 0x00;
+	vector<string> eventInjectSplit = UTIL_SplitString(injectedEventFull, eventKey);
+
+	for (unsigned int i = 0; i < eventInjectSplit.size(); i++) {
+		string injectedEventStr = eventInjectSplit.at(i);
+		if (injectedEventStr.length() < 5)
+			continue;
+
+		int categoryIndex = injectedEventStr.find("SS");
+		if (categoryIndex >= 0) {
+			// 2/l46kok/1/H000/1
+			categoryIndex += 3;
+			string servantSelectionStr = injectedEventStr.substr(categoryIndex, injectedEventStr.size() - categoryIndex);
+			vector<string> splitStr = UTIL_Tokenize(servantSelectionStr, '/');
+			if (splitStr.size() < 5) {
+				CONSOLE_Print("[FRS]: ERROR Expected SS split str 5 or greater: " + servantSelectionStr);
+				return;
+			}
+
+			string eventId = splitStr[0];
+			if (m_FRSEventHandled.count(eventId))
+				continue;
+			
+			if (splitStr[4].length() <= 0) {
+				CONSOLE_Print("[FRS]: ERROR Expected SS substring length to be 2 or greater: " + servantSelectionStr);
+				return;
+			}
+			string servantSelection = "SS/" + splitStr[1] + "/" + splitStr[2] + "/" + splitStr[3] + "/" + splitStr[4][0];
+			m_FRSEventInfoList[eventId] = servantSelection;
+			m_FRSEventHandled[eventId] = true;
+			continue;
+		}
+
+		categoryIndex = injectedEventStr.find("RoundVictory");
+		if (categoryIndex >= 0) {
+			// 2/T1
+			categoryIndex += 13;
+			string roundVictoryStr = injectedEventStr.substr(categoryIndex, injectedEventStr.size() - categoryIndex);
+			vector<string> splitStr = UTIL_Tokenize(roundVictoryStr, '/');
+			if (splitStr.size() < 2) {
+				CONSOLE_Print("[FRS]: ERROR Expected RV split str 2 or greater: " + roundVictoryStr);
+				return;
+			}
+
+			string eventId = splitStr[0];
+			if (m_FRSEventHandled.count(eventId))
+				continue;
+			if (splitStr[1].length() < 2) {
+				CONSOLE_Print("[FRS]: ERROR Expected RV substring length to be 2 or greater: " + roundVictoryStr);
+				return;
+			}
+
+			string roundResult = splitStr[1].substr(0, 2);
+
+			if (roundResult != "Dr") {
+				string roundVictory = "RoundVictory/" + roundResult;
+				m_FRSEventInfoList[eventId] = roundVictory;
+				m_FRSEventHandled[eventId] = true;
+			}
+			
+			continue;
+		}
+
+		categoryIndex = injectedEventStr.find("Suicide");
+		if (categoryIndex >= 0) {
+			categoryIndex += 8;
+			string suicideStr = injectedEventStr.substr(categoryIndex, injectedEventStr.size() - categoryIndex);
+			vector<string> splitStr = UTIL_Tokenize(suicideStr, '/');
+			if (splitStr.size() < 2) {
+				CONSOLE_Print("[FRS]: ERROR Expected Suicide split str 2 or greater: " + suicideStr);
+				return;
+			}
+
+			string eventId = splitStr[0];
+			if (m_FRSEventHandled.count(eventId))
+				continue;
+			m_FRSEventHandled[eventId] = true;
+			uint32_t pid = UTIL_ToUInt32(splitStr[1].substr(0, 2));
+			m_FRSDeaths[pid] += 1;
+			
+			continue;
+		}
+
+		if (injectedEventStr.at(0) == 0x00 && injectedEventStr.at(2) == 0x00 && (injectedEventStr.at(1) == 'K' || injectedEventStr.at(1) == 'A')) {
+			categoryIndex = 1;
+			string kdaStr = injectedEventStr.substr(categoryIndex, injectedEventStr.size() - categoryIndex);
+			vector<string> splitStr = UTIL_Tokenize(kdaStr, '/');
+			if (splitStr.size() < 2) {
+				CONSOLE_Print("[FRS]: ERROR Expected KDA split str 2 or greater: " + kdaStr);
+				return;
+			}
+
+			string eventId = splitStr[0];
+			if (m_FRSEventHandled.count(eventId))
+				continue;
+			m_FRSEventHandled[eventId] = true;
+
+			uint32_t killerId = UTIL_ToUInt32(splitStr[1].substr(0, 2));
+			if (injectedEventStr.at(1) == 'K') {
+				uint32_t victimId = UTIL_ToUInt32(splitStr[2].substr(0, 2));
+				m_FRSKills[killerId] += 1;
+				m_FRSDeaths[victimId] += 1;
+			}
+			else if (injectedEventStr.at(1) == 'A') {
+				m_FRSAssists[killerId] += 1;
+			}
+			
+			continue;
+		}
+	}
+}
+
+
 void CBaseGame :: SendAllActions( )
 {
 	bool UsingGProxy = false;
@@ -1308,6 +1439,9 @@ void CBaseGame :: SendAllActions( )
 		queue<CIncomingAction *> SubActions;
 		CIncomingAction *Action = m_Actions.front( );
 		m_Actions.pop( );
+
+		// Fate / Another FRS Event API
+		HandleFRSEventInjection(Action);
 		SubActions.push( Action );
 		uint32_t SubActionsLength = Action->GetLength( );
 
@@ -1741,6 +1875,11 @@ void CBaseGame :: EventPlayerJoined( CPotentialPlayer *potential, CIncomingJoinP
 				JoinedRealm = (*i)->GetServer( );
 		}
 	}
+	else 
+	{
+		JoinedRealm = "Garena";
+	}
+
 
 	// check if the new player's name is banned but only if bot_banmethod is not 0
 	// this is because if bot_banmethod is 0 and we announce the ban here it's possible for the player to be rejected later because the game is full

@@ -511,6 +511,7 @@ CGHost :: CGHost( CConfig *CFG )
 	m_Reconnect = CFG->GetInt( "bot_reconnect", 1 ) == 0 ? false : true;
 	m_ReconnectPort = CFG->GetInt( "bot_reconnectport", 6114 );
 	m_FRSPort = CFG->GetInt("bot_frsport", 6302);
+	m_FRSLanHostName = CFG->GetString("bot_lanhostname", "UFWHost");
 	m_DefaultMap = CFG->GetString( "bot_defaultmap", "map" );
 	m_AdminGameCreate = CFG->GetInt( "admingame_create", 0 ) == 0 ? false : true;
 	m_AdminGamePort = CFG->GetInt( "admingame_port", 6113 );

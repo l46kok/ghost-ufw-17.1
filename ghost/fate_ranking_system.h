@@ -16,6 +16,8 @@ private:
 	bool m_FRSConnect;						// config value: flag for FRS connection
 	uint16_t m_hostPort;
 	string m_BindAddress;
+	void GetGames(void *send_fd);
+	void RefreshBanList();
 };
 
 

@@ -184,6 +184,7 @@ public:
 	void RemoveBan( string name );
 	void HoldFriends( CBaseGame *game );
 	void HoldClan( CBaseGame *game );
+	void RefreshBanList();
 };
 
 #endif

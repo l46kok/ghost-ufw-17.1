@@ -18,7 +18,6 @@
 
 */
 
-#ifdef GHOST_MYSQL
 
 #include "ghost.h"
 #include "util.h"
@@ -279,14 +278,14 @@ CCallableBanRemove *CGHostDBMySQL :: ThreadedBanRemove( string user )
 	return Callable;
 }
 
-CCallableBanList *CGHostDBMySQL :: ThreadedBanList( string server )
+CCallableBanList *CGHostDBMySQL :: ThreadedBanList( )
 {
 	void *Connection = GetIdleConnection( );
 
 	if( !Connection )
 		m_NumConnections++;
 
-	CCallableBanList *Callable = new CMySQLCallableBanList( server, Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port );
+	CCallableBanList *Callable = new CMySQLCallableBanList( Connection, m_BotID, m_Server, m_Database, m_User, m_Password, m_Port );
 	CreateThread( Callable );
 	m_OutstandingCallables++;
 	return Callable;
@@ -743,11 +742,10 @@ bool MySQLBanRemove( void *conn, string *error, uint32_t botid, string user )
 	return Success;
 }
 
-vector<CDBBan *> MySQLBanList( void *conn, string *error, uint32_t botid, string server )
+vector<CDBBan *> MySQLBanList( void *conn, string *error, uint32_t botid)
 {
-	string EscServer = MySQLEscapeString( conn, server );
 	vector<CDBBan *> BanList;
-	string Query = "SELECT name, ip, DATE(date), gamename, admin, reason FROM bans WHERE server='" + EscServer + "'";
+	string Query = "SELECT name, ip, DATE(date), gamename, admin, reason FROM bans";
 
 	if( mysql_real_query( (MYSQL *)conn, Query.c_str( ), Query.size( ) ) != 0 )
 		*error = mysql_error( (MYSQL *)conn );
@@ -761,7 +759,7 @@ vector<CDBBan *> MySQLBanList( void *conn, string *error, uint32_t botid, string
 
 			while( Row.size( ) == 6 )
 			{
-				BanList.push_back( new CDBBan( server, Row[0], Row[1], Row[2], Row[3], Row[4], Row[5] ) );
+				BanList.push_back( new CDBBan( "", Row[0], Row[1], Row[2], Row[3], Row[4], Row[5] ) );
 				Row = MySQLFetchRow( Result );
 			}
 
@@ -1276,7 +1274,7 @@ void CMySQLCallableBanList :: operator( )( )
 	Init( );
 
 	if( m_Error.empty( ) )
-		m_Result = MySQLBanList( m_Connection, &m_Error, m_SQLBotID, m_Server );
+		m_Result = MySQLBanList( m_Connection, &m_Error, m_SQLBotID );
 
 	Close( );
 }
@@ -1388,4 +1386,3 @@ void CMySQLCallableW3MMDVarAdd :: operator( )( )
 	Close( );
 }
 
-#endif

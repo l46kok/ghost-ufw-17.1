@@ -1551,10 +1551,10 @@ CCallableBanRemove *CGHostDBSQLite :: ThreadedBanRemove( string user )
 	return Callable;
 }
 
-CCallableBanList *CGHostDBSQLite :: ThreadedBanList( string server )
+CCallableBanList *CGHostDBSQLite :: ThreadedBanList( )
 {
-	CCallableBanList *Callable = new CCallableBanList( server );
-	Callable->SetResult( BanList( server ) );
+	CCallableBanList *Callable = new CCallableBanList( "" );
+	Callable->SetResult( BanList( "" ) );
 	Callable->SetReady( true );
 	return Callable;
 }

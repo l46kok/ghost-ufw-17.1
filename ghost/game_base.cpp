@@ -502,7 +502,7 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 				BYTEARRAY MapHeight;
 				MapHeight.push_back( 0 );
 				MapHeight.push_back( 0 );
-				m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), MapWidth, MapHeight, m_GameName, "UFWHostAsia", GetTime( ) - m_CreationTime, "Save\\Multiplayer\\" + m_SaveGame->GetFileNameNoPath( ), m_SaveGame->GetMagicNumber( ), 12, 12, m_HostPort, FixedHostCounter ) );
+				m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), MapWidth, MapHeight, m_GameName, m_GHost->m_FRSLanHostName, GetTime( ) - m_CreationTime, "Save\\Multiplayer\\" + m_SaveGame->GetFileNameNoPath( ), m_SaveGame->GetMagicNumber( ), 12, 12, m_HostPort, FixedHostCounter ) );
 			}
 			else
 			{
@@ -516,7 +516,7 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 				// CONSOLE_Print("[TESTBC] Broadcasting Lan Version: " + UTIL_ToString(m_GHost->m_LANWar3Version));
 				uint32_t MapGameType = MAPGAMETYPE_UNKNOWN0;
 				// m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), m_Map->GetMapWidth( ), m_Map->GetMapHeight( ), m_GameName, "Varlock", GetTime( ) - m_CreationTime, m_Map->GetMapPath( ), m_Map->GetMapCRC( ), 12, 12, m_HostPort, FixedHostCounter ) );
-				m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), m_Map->GetMapWidth( ), m_Map->GetMapHeight( ), m_GameName, "UFWHostAsia", GetTime( ) - m_CreationTime, m_Map->GetMapPath( ), m_Map->GetMapCRC( ), slotstotal, slotsopen, m_HostPort, FixedHostCounter ) );
+				m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), m_Map->GetMapWidth( ), m_Map->GetMapHeight( ), m_GameName, m_GHost->m_FRSLanHostName, GetTime( ) - m_CreationTime, m_Map->GetMapPath( ), m_Map->GetMapCRC( ), slotstotal, slotsopen, m_HostPort, FixedHostCounter ) );
 			}
 		}
 
@@ -1887,39 +1887,39 @@ void CBaseGame :: EventPlayerJoined( CPotentialPlayer *potential, CIncomingJoinP
 
 	if( m_GHost->m_BanMethod != 0 )
 	{
-		for( vector<CBNET *> :: iterator i = m_GHost->m_BNETs.begin( ); i != m_GHost->m_BNETs.end( ); i++ )
-		{
-			if( (*i)->GetServer( ) == JoinedRealm )
+		// FRS Modification
+		// Bans are not dependent on BNET servers. We only have to loop through once.
+		// TODO: Fix so that bans are not coupled to BNET
+
+		vector<CBNET *> :: iterator i = m_GHost->m_BNETs.begin( );
+		if (i != m_GHost->m_BNETs.end()) {
+			CDBBan *Ban = (*i)->IsBannedName( joinPlayer->GetName( ) );
+
+			if( Ban )
 			{
-				CDBBan *Ban = (*i)->IsBannedName( joinPlayer->GetName( ) );
-
-				if( Ban )
+				if( m_GHost->m_BanMethod == 1 || m_GHost->m_BanMethod == 3 )
 				{
-					if( m_GHost->m_BanMethod == 1 || m_GHost->m_BanMethod == 3 )
+					CONSOLE_Print( "[GAME: " + m_GameName + "] player [" + joinPlayer->GetName( ) + "|" + potential->GetExternalIPString( ) + "] is trying to join the game but is banned by name" );
+
+					if( m_IgnoredNames.find( joinPlayer->GetName( ) ) == m_IgnoredNames.end( ) )
 					{
-						CONSOLE_Print( "[GAME: " + m_GameName + "] player [" + joinPlayer->GetName( ) + "|" + potential->GetExternalIPString( ) + "] is trying to join the game but is banned by name" );
-
-						if( m_IgnoredNames.find( joinPlayer->GetName( ) ) == m_IgnoredNames.end( ) )
-						{
-							SendAllChat( m_GHost->m_Language->TryingToJoinTheGameButBannedByName( joinPlayer->GetName( ) ) );
-							SendAllChat( m_GHost->m_Language->UserWasBannedOnByBecause( Ban->GetServer( ), Ban->GetName( ), Ban->GetDate( ), Ban->GetAdmin( ), Ban->GetReason( ) ) );
-							m_IgnoredNames.insert( joinPlayer->GetName( ) );
-						}
-
-						// let banned players "join" the game with an arbitrary PID then immediately close the connection
-						// this causes them to be kicked back to the chat channel on battle.net
-
-						vector<CGameSlot> Slots = m_Map->GetSlots( );
-						potential->Send( m_Protocol->SEND_W3GS_SLOTINFOJOIN( 1, potential->GetSocket( )->GetPort( ), potential->GetExternalIP( ), Slots, 0, m_Map->GetMapLayoutStyle( ), m_Map->GetMapNumPlayers( ) ) );
-						potential->SetDeleteMe( true );
-						return;
+						SendAllChat( m_GHost->m_Language->TryingToJoinTheGameButBannedByName( joinPlayer->GetName( ) ) );
+						SendAllChat( m_GHost->m_Language->UserWasBannedOnByBecause( Ban->GetServer( ), Ban->GetName( ), Ban->GetDate( ), Ban->GetAdmin( ), Ban->GetReason( ) ) );
+						m_IgnoredNames.insert( joinPlayer->GetName( ) );
 					}
 
-					break;
+					// let banned players "join" the game with an arbitrary PID then immediately close the connection
+					// this causes them to be kicked back to the chat channel on battle.net
+
+					vector<CGameSlot> Slots = m_Map->GetSlots( );
+					potential->Send( m_Protocol->SEND_W3GS_SLOTINFOJOIN( 1, potential->GetSocket( )->GetPort( ), potential->GetExternalIP( ), Slots, 0, m_Map->GetMapLayoutStyle( ), m_Map->GetMapNumPlayers( ) ) );
+					potential->SetDeleteMe( true );
+					return;
 				}
 			}
 
-			CDBBan *Ban = (*i)->IsBannedIP( potential->GetExternalIPString( ) );
+			string ipAddr = potential->GetExternalIPString( );
+			Ban = (*i)->IsBannedIP( potential->GetExternalIPString( ) );
 
 			if( Ban )
 			{
@@ -1942,10 +1942,9 @@ void CBaseGame :: EventPlayerJoined( CPotentialPlayer *potential, CIncomingJoinP
 					potential->SetDeleteMe( true );
 					return;
 				}
-
-				break;
 			}
 		}
+	
 	}
 
 	if( m_MatchMaking && m_AutoStartPlayers != 0 && !m_Map->GetMapMatchMakingCategory( ).empty( ) && m_Map->GetMapOptions( ) & MAPOPT_FIXEDPLAYERSETTINGS )

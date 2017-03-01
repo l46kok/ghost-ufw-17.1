@@ -4,6 +4,7 @@
 #include "fate_ranking_system.h"
 #include "game_base.h"
 #include "gameplayer.h"
+#include "bnet.h"
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
@@ -88,122 +89,14 @@ bool FRS :: Update( void *fd, void *send_fd )
 			string RecvBuffer = *(m_FRSClientSocket->GetBytes());
 			if (!RecvBuffer.empty())
 			{
-				ptree gamePt;
-				ptree lobbyPt;
-				ptree progressArrPt;
-				std::stringstream ss;
-				
 				if (RecvBuffer == "GetGames")
 				{
-					if (m_GHost->m_CurrentGame)
-					{
-						lobbyPt.put("IsAvailable",true);
-						lobbyPt.put("PlayerCount",m_GHost->m_CurrentGame->GetNumHumanPlayers());
-						lobbyPt.put("SlotSize",m_GHost->m_CurrentGame->GetSlots());
-						lobbyPt.put("GameName",m_GHost->m_CurrentGame->GetGameName());
-						lobbyPt.put("Owner",m_GHost->m_CurrentGame->GetOwnerName());
-
-						ptree lobbyPlayersPt;
-						vector<CGamePlayer *> lobbyPlayers = m_GHost->m_CurrentGame->GetGamePlayers();
-						for( vector<CGamePlayer *> :: iterator i = lobbyPlayers.begin(); i != lobbyPlayers.end( ); i++ )
-						{
-							if( !(*i)->GetLeftMessageSent())
-							{	
-								ptree lobbyPlPt;
-								lobbyPlPt.put("PlayerName",(*i)->GetNameTerminated());
-								lobbyPlPt.put("Server",(*i)->GetJoinedRealm());
-								lobbyPlPt.put("Ping",(*i)->GetPing(m_GHost->m_LCPings));
-								lobbyPlayersPt.push_back(std::make_pair("",lobbyPlPt));
-							}
-						}
-
-						if (!lobbyPlayersPt.empty()) {
-							lobbyPt.add_child("LobbyPlayers",lobbyPlayersPt);
-						}
-					}
-					else
-					{
-						lobbyPt.put("IsAvailable",false);
-					}
-
-					for (unsigned int i = 0; i < m_GHost->m_Games.size( ); i++)
-					{
-						ptree progressPt;
-						progressPt.put("GameNumber",i+1);
-						progressPt.put("PlayerCount",m_GHost->m_Games[i]->GetNumHumanPlayers());
-						progressPt.put("SlotSize",m_GHost->m_Games[i]->GetStartPlayers());
-						progressPt.put("GameName",m_GHost->m_Games[i]->GetGameName());
-						progressPt.put("Owner",m_GHost->m_Games[i]->GetOwnerName());
-						progressPt.put("GameDuration",m_GHost->m_Games[i]->GetGameDuration());
-
-						ptree gamePlayersPt;
-						vector<CGamePlayer *> gamePlayers = m_GHost->m_Games[i]->GetGamePlayers();
-						for( vector<CGamePlayer *> :: iterator j = gamePlayers.begin(); j != gamePlayers.end( ); j++ )
-						{
-							ptree gamePlPt;
-							gamePlPt.put("PlayerName",(*j)->GetNameTerminated());
-							gamePlPt.put("Server",(*j)->GetJoinedRealm());
-							gamePlPt.put("Ping",(*j)->GetPing(m_GHost->m_LCPings));
-							gamePlPt.put("IsConnected",!(*j)->GetLeftMessageSent());
-							gamePlayersPt.push_back(std::make_pair("",gamePlPt));
-						}
-
-						if (!gamePlayersPt.empty()) {
-							map<string, string> frsEventList = m_GHost->m_Games[i]->GetFRSEventInfo();
-							ptree frsEventListPt; 
-							for (map<string, string> ::iterator k = frsEventList.begin(); k != frsEventList.end(); k++)
-							{
-								frsEventListPt.push_back(std::make_pair("",k->second));
-							}
-
-							ptree frsKillsPt;
-							map<uint32_t, uint32_t> frsKills = m_GHost->m_Games[i]->GetFRSKills();
-							for (map<uint32_t, uint32_t> :: iterator k = frsKills.begin(); k != frsKills.end(); k++)
-							{
-								ptree killPt;
-								killPt.put("PlayerID",k->first);
-								killPt.put("Kills",k->second);
-								frsKillsPt.push_back(std::make_pair("",killPt));
-							}
-
-							ptree frsDeathsPt;
-							map<uint32_t, uint32_t> frsDeaths = m_GHost->m_Games[i]->GetFRSDeaths();
-							for (map<uint32_t, uint32_t> :: iterator k = frsDeaths.begin(); k != frsDeaths.end(); k++)
-							{
-								ptree deathPt;
-								deathPt.put("PlayerID",k->first);
-								deathPt.put("Deaths",k->second);
-								frsDeathsPt.push_back(std::make_pair("",deathPt));
-							}
-
-							ptree frsAssistsPt;
-							map<uint32_t, uint32_t> frsAssists = m_GHost->m_Games[i]->GetFRSAssists();
-							for (map<uint32_t, uint32_t> :: iterator k = frsAssists.begin(); k != frsAssists.end(); k++)
-							{
-								ptree assistPt;
-								assistPt.put("PlayerID",k->first);
-								assistPt.put("Assists",k->second);
-								frsAssistsPt.push_back(std::make_pair("",assistPt));
-							}
-							progressPt.add_child("FRSEvents", frsEventListPt);
-							progressPt.add_child("FRSKills", frsKillsPt);
-							progressPt.add_child("FRSDeaths", frsDeathsPt);
-							progressPt.add_child("FRSAssists", frsAssistsPt);
-							progressPt.add_child("ProgressPlayers", gamePlayersPt);
-						}
-
-						progressArrPt.push_back(std::make_pair("", progressPt));
-					}
-					gamePt.add_child("Lobby",lobbyPt);
-					gamePt.add_child("Progress",progressArrPt);
-					write_json(ss,gamePt);
-					string jsonContent = ss.str();
-					uint32_t byteLength = jsonContent.length();
-					BYTEARRAY byteLengthArr = UTIL_CreateByteArray(byteLength, 4);
-					jsonContent = string(byteLengthArr.begin(), byteLengthArr.end()) + jsonContent;
-					m_FRSClientSocket->PutBytes(jsonContent);
-					m_FRSClientSocket->DoSend((fd_set *)send_fd);
+					GetGames(send_fd);
 				}	
+				else if (RecvBuffer == "RefreshBanList")
+				{
+					RefreshBanList();
+				}
 			}
 			m_FRSClientSocket->ClearRecvBuffer();
 		}
@@ -215,4 +108,126 @@ bool FRS :: Update( void *fd, void *send_fd )
 		m_FRSClientSocket = NewSocket;
 	}
 	return true;
+}
+
+void FRS :: GetGames(void* send_fd) {
+	ptree gamePt;
+	ptree lobbyPt;
+	ptree progressArrPt;
+	std::stringstream ss;
+	if (m_GHost->m_CurrentGame)
+	{
+		lobbyPt.put("IsAvailable",true);
+		lobbyPt.put("PlayerCount",m_GHost->m_CurrentGame->GetNumHumanPlayers());
+		lobbyPt.put("SlotSize",m_GHost->m_CurrentGame->GetSlots());
+		lobbyPt.put("GameName",m_GHost->m_CurrentGame->GetGameName());
+		lobbyPt.put("Owner",m_GHost->m_CurrentGame->GetOwnerName());
+
+		ptree lobbyPlayersPt;
+		vector<CGamePlayer *> lobbyPlayers = m_GHost->m_CurrentGame->GetGamePlayers();
+		for( vector<CGamePlayer *> :: iterator i = lobbyPlayers.begin(); i != lobbyPlayers.end( ); i++ )
+		{
+			if( !(*i)->GetLeftMessageSent())
+			{	
+				ptree lobbyPlPt;
+				lobbyPlPt.put("PlayerName",(*i)->GetNameTerminated());
+				lobbyPlPt.put("Server",(*i)->GetJoinedRealm());
+				lobbyPlPt.put("Ping",(*i)->GetPing(m_GHost->m_LCPings));
+				lobbyPlayersPt.push_back(std::make_pair("",lobbyPlPt));
+			}
+		}
+
+		if (!lobbyPlayersPt.empty()) {
+			lobbyPt.add_child("LobbyPlayers",lobbyPlayersPt);
+		}
+	}
+	else
+	{
+		lobbyPt.put("IsAvailable",false);
+	}
+
+	for (unsigned int i = 0; i < m_GHost->m_Games.size( ); i++)
+	{
+		ptree progressPt;
+		progressPt.put("GameNumber",i+1);
+		progressPt.put("PlayerCount",m_GHost->m_Games[i]->GetNumHumanPlayers());
+		progressPt.put("SlotSize",m_GHost->m_Games[i]->GetStartPlayers());
+		progressPt.put("GameName",m_GHost->m_Games[i]->GetGameName());
+		progressPt.put("Owner",m_GHost->m_Games[i]->GetOwnerName());
+		progressPt.put("GameDuration",m_GHost->m_Games[i]->GetGameDuration());
+
+		ptree gamePlayersPt;
+		vector<CGamePlayer *> gamePlayers = m_GHost->m_Games[i]->GetGamePlayers();
+		for( vector<CGamePlayer *> :: iterator j = gamePlayers.begin(); j != gamePlayers.end( ); j++ )
+		{
+			ptree gamePlPt;
+			gamePlPt.put("PlayerName",(*j)->GetNameTerminated());
+			gamePlPt.put("Server",(*j)->GetJoinedRealm());
+			gamePlPt.put("Ping",(*j)->GetPing(m_GHost->m_LCPings));
+			gamePlPt.put("IsConnected",!(*j)->GetLeftMessageSent());
+			gamePlayersPt.push_back(std::make_pair("",gamePlPt));
+		}
+
+		if (!gamePlayersPt.empty()) {
+			map<string, string> frsEventList = m_GHost->m_Games[i]->GetFRSEventInfo();
+			ptree frsEventListPt; 
+			for (map<string, string> ::iterator k = frsEventList.begin(); k != frsEventList.end(); k++)
+			{
+				frsEventListPt.push_back(std::make_pair("",k->second));
+			}
+
+			ptree frsKillsPt;
+			map<uint32_t, uint32_t> frsKills = m_GHost->m_Games[i]->GetFRSKills();
+			for (map<uint32_t, uint32_t> :: iterator k = frsKills.begin(); k != frsKills.end(); k++)
+			{
+				ptree killPt;
+				killPt.put("PlayerID",k->first);
+				killPt.put("Kills",k->second);
+				frsKillsPt.push_back(std::make_pair("",killPt));
+			}
+
+			ptree frsDeathsPt;
+			map<uint32_t, uint32_t> frsDeaths = m_GHost->m_Games[i]->GetFRSDeaths();
+			for (map<uint32_t, uint32_t> :: iterator k = frsDeaths.begin(); k != frsDeaths.end(); k++)
+			{
+				ptree deathPt;
+				deathPt.put("PlayerID",k->first);
+				deathPt.put("Deaths",k->second);
+				frsDeathsPt.push_back(std::make_pair("",deathPt));
+			}
+
+			ptree frsAssistsPt;
+			map<uint32_t, uint32_t> frsAssists = m_GHost->m_Games[i]->GetFRSAssists();
+			for (map<uint32_t, uint32_t> :: iterator k = frsAssists.begin(); k != frsAssists.end(); k++)
+			{
+				ptree assistPt;
+				assistPt.put("PlayerID",k->first);
+				assistPt.put("Assists",k->second);
+				frsAssistsPt.push_back(std::make_pair("",assistPt));
+			}
+			progressPt.add_child("FRSEvents", frsEventListPt);
+			progressPt.add_child("FRSKills", frsKillsPt);
+			progressPt.add_child("FRSDeaths", frsDeathsPt);
+			progressPt.add_child("FRSAssists", frsAssistsPt);
+			progressPt.add_child("ProgressPlayers", gamePlayersPt);
+		}
+
+		progressArrPt.push_back(std::make_pair("", progressPt));
+	}
+	gamePt.add_child("Lobby",lobbyPt);
+	gamePt.add_child("Progress",progressArrPt);
+	write_json(ss,gamePt);
+	string jsonContent = ss.str();
+	uint32_t byteLength = jsonContent.length();
+	BYTEARRAY byteLengthArr = UTIL_CreateByteArray(byteLength, 4);
+	jsonContent = string(byteLengthArr.begin(), byteLengthArr.end()) + jsonContent;
+	m_FRSClientSocket->PutBytes(jsonContent);
+	m_FRSClientSocket->DoSend((fd_set *)send_fd);
+}
+
+void FRS :: RefreshBanList() {
+	for( vector<CBNET *> :: iterator i = m_GHost->m_BNETs.begin( ); i != m_GHost->m_BNETs.end( ); i++ )
+	{
+		(*i)->RefreshBanList();
+	}
 }

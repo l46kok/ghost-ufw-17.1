@@ -18,6 +18,8 @@
 
 */
 
+#define BANLIST_REFRESH_PERIOD 3600
+
 #include "ghost.h"
 #include "util.h"
 #include "config.h"
@@ -54,7 +56,7 @@ CBNET :: CBNET( CGHost *nGHost, string nServer, string nServerAlias, string nBNL
 	m_BNLSClient = NULL;
 	m_BNCSUtil = new CBNCSUtilInterface( nUserName, nUserPassword );
 	m_CallableAdminList = m_GHost->m_DB->ThreadedAdminList( nServer );
-	m_CallableBanList = m_GHost->m_DB->ThreadedBanList( nServer );
+	m_CallableBanList = m_GHost->m_DB->ThreadedBanList( );
 	m_Exiting = false;
 	m_Server = nServer;
 	string LowerServer = m_Server;
@@ -417,12 +419,12 @@ bool CBNET :: Update( void *fd, void *send_fd )
 
 	// refresh the ban list every 60 minutes
 
-	if( !m_CallableBanList && GetTime( ) - m_LastBanRefreshTime >= 3600 )
-		m_CallableBanList = m_GHost->m_DB->ThreadedBanList( m_Server );
+	if( !m_CallableBanList && GetTime( ) - m_LastBanRefreshTime >= BANLIST_REFRESH_PERIOD )
+		m_CallableBanList = m_GHost->m_DB->ThreadedBanList( );
 
 	if( m_CallableBanList && m_CallableBanList->GetReady( ) )
 	{
-		// CONSOLE_Print( "[BNET: " + m_ServerAlias + "] refreshed ban list (" + UTIL_ToString( m_Bans.size( ) ) + " -> " + UTIL_ToString( m_CallableBanList->GetResult( ).size( ) ) + " bans)" );
+		CONSOLE_Print( "[BNET: " + m_ServerAlias + "] refreshed ban list (" + UTIL_ToString( m_Bans.size( ) ) + " -> " + UTIL_ToString( m_CallableBanList->GetResult( ).size( ) ) + " bans)" );
 
 		for( vector<CDBBan *> :: iterator i = m_Bans.begin( ); i != m_Bans.end( ); i++ )
 			delete *i;
@@ -2564,4 +2566,9 @@ void CBNET :: HoldClan( CBaseGame *game )
 		for( vector<CIncomingClanList *> :: iterator i = m_Clans.begin( ); i != m_Clans.end( ); i++ )
 			game->AddToReserved( (*i)->GetName( ) );
 	}
+}
+
+void CBNET :: RefreshBanList()
+{
+	m_LastBanRefreshTime += BANLIST_REFRESH_PERIOD;
 }

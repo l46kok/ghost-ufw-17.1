@@ -237,7 +237,7 @@ CCallableBanRemove *CGHostDB :: ThreadedBanRemove( string user )
 	return NULL;
 }
 
-CCallableBanList *CGHostDB :: ThreadedBanList( string server )
+CCallableBanList *CGHostDB :: ThreadedBanList( )
 {
 	return NULL;
 }

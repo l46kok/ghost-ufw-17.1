@@ -26,6 +26,7 @@ class CCommandPacket;
 class CGameProtocol;
 class CGame;
 class CIncomingJoinPlayer;
+class CIncomingGarenaUser;
 
 //
 // CPotentialPlayer
@@ -47,6 +48,7 @@ protected:
 	bool m_Error;
 	string m_ErrorString;
 	CIncomingJoinPlayer *m_IncomingJoinPlayer;
+	CIncomingGarenaUser *m_IncomingGarenaUser;
 
 public:
 	CPotentialPlayer( CGameProtocol *nProtocol, CBaseGame *nGame, CTCPSocket *nSocket );
@@ -60,9 +62,12 @@ public:
 	virtual bool GetError( )						{ return m_Error; }
 	virtual string GetErrorString( )				{ return m_ErrorString; }
 	virtual CIncomingJoinPlayer *GetJoinPlayer( )	{ return m_IncomingJoinPlayer; }
+	virtual CIncomingGarenaUser *GetGarenaUser( )	{ return m_IncomingGarenaUser; }
+	virtual BYTEARRAY GetGarenaIP( );
 
 	virtual void SetSocket( CTCPSocket *nSocket )	{ m_Socket = nSocket; }
 	virtual void SetDeleteMe( bool nDeleteMe )		{ m_DeleteMe = nDeleteMe; }
+	virtual void SetGarenaUser( CIncomingGarenaUser *nIncomingGarenaUser ) { m_IncomingGarenaUser = nIncomingGarenaUser; }
 
 	// processing functions
 

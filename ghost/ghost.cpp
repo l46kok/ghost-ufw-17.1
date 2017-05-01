@@ -36,6 +36,7 @@
 #include "fate_ranking_system.h"
 #include "gameplayer.h"
 #include "gameprotocol.h"
+#include "gcbiprotocol.h"
 #include "gpsprotocol.h"
 #include "game_base.h"
 #include "game.h"
@@ -399,6 +400,7 @@ CGHost :: CGHost( CConfig *CFG )
 	m_ReconnectSocket = NULL;
 	
 	m_GPSProtocol = new CGPSProtocol( );
+	m_GCBIProtocol = new CGCBIProtocol( );
 	m_CRC = new CCRC32( );
 	m_CRC->Initialize( );
 	m_SHA = new CSHA1( );
@@ -704,6 +706,7 @@ CGHost :: ~CGHost( )
 		delete *i;
 
 	delete m_GPSProtocol;
+	delete m_GCBIProtocol;
 	delete m_CRC;
 	delete m_SHA;
 

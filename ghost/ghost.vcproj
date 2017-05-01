@@ -400,6 +400,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\gcbiprotocol.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\ghost.cpp"
 				>
 			</File>
@@ -535,6 +539,10 @@
 			</File>
 			<File
 				RelativePath=".\gameslot.h"
+				>
+			</File>
+			<File
+				RelativePath=".\gcbiprotocol.h"
 				>
 			</File>
 			<File

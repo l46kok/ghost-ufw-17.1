@@ -32,6 +32,7 @@
 #include "gameplayer.h"
 #include "gameprotocol.h"
 #include "game_base.h"
+#include "gcbiprotocol.h"
 
 #include <cmath>
 #include <string.h>
@@ -288,6 +289,17 @@ uint32_t CBaseGame :: GetSlotsOccupied( )
 	return NumSlotsOccupied;
 }
 
+uint32_t CBaseGame :: GetSlotsAllocated( )
+{
+	uint32_t SlotsOccupied = GetSlotsOccupied( );
+	uint32_t NumPlayers = m_Players.size( );
+
+	if( NumPlayers > SlotsOccupied )
+		return NumPlayers;
+	else
+		return SlotsOccupied;
+} 
+
 uint32_t CBaseGame :: GetSlotsOpen( )
 {
 	uint32_t NumSlotsOpen = 0;
@@ -452,7 +464,7 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 
 	// create the virtual host player
 
-	if( !m_GameLoading && !m_GameLoaded && GetNumPlayers( ) < 12 )
+	if( !m_GameLoading && !m_GameLoaded && GetSlotsAllocated() < m_Slots.size() )
 		CreateVirtualHost( );
 
 	// unlock the game
@@ -491,6 +503,12 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 
 			uint32_t FixedHostCounter = m_HostCounter & 0x0FFFFFFF;
 
+			uint32_t slotstotal = m_Slots.size( );
+			uint32_t slotsopen = GetSlotsOpen();
+			if (slotsopen<2) slotsopen = 2;
+			if(slotstotal > 12) slotstotal = 12;
+
+
 			if( m_SaveGame )
 			{
 				// note: the PrivateGame flag is not set when broadcasting to LAN (as you might expect)
@@ -502,7 +520,7 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 				BYTEARRAY MapHeight;
 				MapHeight.push_back( 0 );
 				MapHeight.push_back( 0 );
-				m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), MapWidth, MapHeight, m_GameName, m_GHost->m_FRSLanHostName, GetTime( ) - m_CreationTime, "Save\\Multiplayer\\" + m_SaveGame->GetFileNameNoPath( ), m_SaveGame->GetMagicNumber( ), 12, 12, m_HostPort, FixedHostCounter ) );
+				m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), MapWidth, MapHeight, m_GameName, m_GHost->m_FRSLanHostName, GetTime( ) - m_CreationTime, "Save\\Multiplayer\\" + m_SaveGame->GetFileNameNoPath( ), m_SaveGame->GetMagicNumber( ), slotstotal, slotsopen, m_HostPort, FixedHostCounter, m_EntryKey ) );
 			}
 			else
 			{
@@ -515,8 +533,7 @@ bool CBaseGame :: Update( void *fd, void *send_fd )
 				// note: we do not use m_Map->GetMapGameType because none of the filters are set when broadcasting to LAN (also as you might expect)
 				// CONSOLE_Print("[TESTBC] Broadcasting Lan Version: " + UTIL_ToString(m_GHost->m_LANWar3Version));
 				uint32_t MapGameType = MAPGAMETYPE_UNKNOWN0;
-				// m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), m_Map->GetMapWidth( ), m_Map->GetMapHeight( ), m_GameName, "Varlock", GetTime( ) - m_CreationTime, m_Map->GetMapPath( ), m_Map->GetMapCRC( ), 12, 12, m_HostPort, FixedHostCounter ) );
-				m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), m_Map->GetMapWidth( ), m_Map->GetMapHeight( ), m_GameName, m_GHost->m_FRSLanHostName, GetTime( ) - m_CreationTime, m_Map->GetMapPath( ), m_Map->GetMapCRC( ), slotstotal, slotsopen, m_HostPort, FixedHostCounter ) );
+				m_GHost->m_UDPSocket->Broadcast( 6112, m_Protocol->SEND_W3GS_GAMEINFO( m_GHost->m_TFT, m_GHost->m_LANWar3Version, UTIL_CreateByteArray( MapGameType, false ), m_Map->GetMapGameFlags( ), m_Map->GetMapWidth( ), m_Map->GetMapHeight( ), m_GameName, m_GHost->m_FRSLanHostName, GetTime( ) - m_CreationTime, m_Map->GetMapPath( ), m_Map->GetMapCRC( ), slotstotal, slotsopen, m_HostPort, FixedHostCounter, m_EntryKey ) );
 			}
 		}
 
@@ -2120,7 +2137,7 @@ void CBaseGame :: EventPlayerJoined( CPotentialPlayer *potential, CIncomingJoinP
 	// we have a slot for the new player
 	// make room for them by deleting the virtual host player if we have to
 
-	if( GetNumPlayers( ) >= 11 || EnforcePID == m_VirtualHostPID )
+	if( GetSlotsAllocated( ) >= m_Slots.size() - 1 || EnforcePID == m_VirtualHostPID )
 		DeleteVirtualHost( );
 
 	// turning the CPotentialPlayer into a CGamePlayer is a bit of a pain because we have to be careful not to close the socket
@@ -2129,6 +2146,11 @@ void CBaseGame :: EventPlayerJoined( CPotentialPlayer *potential, CIncomingJoinP
 
 	CONSOLE_Print( "[GAME: " + m_GameName + "] player [" + joinPlayer->GetName( ) + "|" + potential->GetExternalIPString( ) + "] joined the game" );
 	CGamePlayer *Player = new CGamePlayer( potential, m_SaveGame ? EnforcePID : GetNewPID( ), JoinedRealm, joinPlayer->GetName( ), joinPlayer->GetInternalIP( ), Reserved );
+
+	if( potential->GetGarenaUser( ) != NULL ) {
+		Player->SetGarenaUser( potential->GetGarenaUser( ) );
+		potential->SetGarenaUser( NULL );
+	}
 
 	// consider LAN players to have already spoof checked since they can't
 	// since so many people have trouble with this feature we now use the JoinedRealm to determine LAN status
@@ -2508,8 +2530,8 @@ void CBaseGame :: EventPlayerJoinedWithScore( CPotentialPlayer *potential, CInco
 	// we have a slot for the new player
 	// make room for them by deleting the virtual host player if we have to
 
-	if( GetNumPlayers( ) >= 11 )
-		DeleteVirtualHost( );
+	if( GetSlotsOccupied( ) >= m_Slots.size() - 1 )
+ 		DeleteVirtualHost( );
 
 	// identify their joined realm
 	// this is only possible because when we send a game refresh via LAN or battle.net we encode an ID value in the 4 most significant bits of the host counter
@@ -4751,7 +4773,7 @@ void CBaseGame :: CreateFakePlayer( )
 
 	if( SID < m_Slots.size( ) )
 	{
-		if( GetNumPlayers( ) >= 11 )
+		if( GetSlotsAllocated( ) >= m_Slots.size() - 1 )
 			DeleteVirtualHost( );
 
 		m_FakePlayerPID = GetNewPID( );

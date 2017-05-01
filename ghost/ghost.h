@@ -31,6 +31,7 @@ class CUDPSocket;
 class CTCPServer;
 class CTCPSocket;
 class CGPSProtocol;
+class CGCBIProtocol;
 class CCRC32;
 class CSHA1;
 class CBNET;
@@ -51,6 +52,7 @@ public:
 	CTCPServer *m_ReconnectSocket;			// listening socket for GProxy++ reliable reconnects
 	vector<CTCPSocket *> m_ReconnectSockets;// vector of sockets attempting to reconnect (connected but not identified yet)
 	CGPSProtocol *m_GPSProtocol;
+	CGCBIProtocol *m_GCBIProtocol;
 	CCRC32 *m_CRC;							// for calculating CRC's
 	CSHA1 *m_SHA;							// for calculating SHA1's
 	vector<CBNET *> m_BNETs;				// all our battle.net connections (there can be more than one)

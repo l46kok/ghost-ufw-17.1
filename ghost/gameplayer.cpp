@@ -27,12 +27,14 @@
 #include "map.h"
 #include "gameplayer.h"
 #include "gameprotocol.h"
+#include "gcbiprotocol.h"
 #include "gpsprotocol.h"
 #include "game_base.h"
 
 //
 // CPotentialPlayer
 //
+
 
 CPotentialPlayer :: CPotentialPlayer( CGameProtocol *nProtocol, CBaseGame *nGame, CTCPSocket *nSocket )
 {
@@ -42,6 +44,7 @@ CPotentialPlayer :: CPotentialPlayer( CGameProtocol *nProtocol, CBaseGame *nGame
 	m_DeleteMe = false;
 	m_Error = false;
 	m_IncomingJoinPlayer = NULL;
+	m_IncomingGarenaUser = NULL;
 }
 
 CPotentialPlayer :: ~CPotentialPlayer( )
@@ -56,22 +59,42 @@ CPotentialPlayer :: ~CPotentialPlayer( )
 	}
 
 	delete m_IncomingJoinPlayer;
+	delete m_IncomingGarenaUser;
+}
+
+BYTEARRAY CPotentialPlayer :: GetGarenaIP( )
+{
+	if( m_IncomingGarenaUser == NULL ) {
+		return UTIL_CreateByteArray( (uint32_t) 0, true );
+	} else {
+		return UTIL_CreateByteArray( m_IncomingGarenaUser->GetIP( ), true );
+	}
 }
 
 BYTEARRAY CPotentialPlayer :: GetExternalIP( )
 {
 	unsigned char Zeros[] = { 0, 0, 0, 0 };
 
-	if( m_Socket )
-		return m_Socket->GetIP( );
+	if( m_Socket ) {
+		if( m_IncomingGarenaUser != NULL )
+			return GetGarenaIP( );
+		else
+			return m_Socket->GetIP( );
+	}
 
 	return UTIL_CreateByteArray( Zeros, 4 );
 }
 
 string CPotentialPlayer :: GetExternalIPString( )
 {
-	if( m_Socket )
-		return m_Socket->GetIPString( );
+	if( m_Socket ) {
+		if( m_IncomingGarenaUser != NULL ) {
+			BYTEARRAY GarenaIP = GetGarenaIP( );
+			return UTIL_ToString(GarenaIP[0]) + "." + UTIL_ToString(GarenaIP[1]) + "." + UTIL_ToString(GarenaIP[2]) + "." + UTIL_ToString(GarenaIP[3]);
+		} else {
+			return m_Socket->GetIPString( );
+		}
+	}
 
 	return string( );
 }
@@ -108,7 +131,7 @@ void CPotentialPlayer :: ExtractPackets( )
 
 	while( Bytes.size( ) >= 4 )
 	{
-		if( Bytes[0] == W3GS_HEADER_CONSTANT || Bytes[0] == GPS_HEADER_CONSTANT )
+		if( Bytes[0] == W3GS_HEADER_CONSTANT || Bytes[0] == GPS_HEADER_CONSTANT || Bytes[0] == GCBI_HEADER_CONSTANT )
 		{
 			// bytes 2 and 3 contain the length of the packet
 
@@ -172,6 +195,15 @@ void CPotentialPlayer :: ProcessPackets( )
 
 				delete Packet;
 				return;
+			}
+		}
+		else if( Packet->GetPacketType( ) == GCBI_HEADER_CONSTANT )
+		{
+			if( Packet->GetID( ) == CGCBIProtocol :: GCBI_INIT )
+			{
+				delete m_IncomingGarenaUser;
+				m_IncomingGarenaUser = m_Game->m_GHost->m_GCBIProtocol->RECEIVE_GCBI_INIT( Packet->GetData( ) );
+				CONSOLE_Print( "[GCBI] Garena user detected; userid=" + UTIL_ToString( m_IncomingGarenaUser->GetUserID( ) ) + ", roomid=" + UTIL_ToString( m_IncomingGarenaUser->GetRoomID( ) ) + ", experience=" + UTIL_ToString( m_IncomingGarenaUser->GetUserExp( ) ) + ", country=" + m_IncomingGarenaUser->GetCountryCode( ) );
 			}
 		}
 
@@ -412,7 +444,7 @@ void CGamePlayer :: ExtractPackets( )
 
 	while( Bytes.size( ) >= 4 )
 	{
-		if( Bytes[0] == W3GS_HEADER_CONSTANT || Bytes[0] == GPS_HEADER_CONSTANT )
+		if( Bytes[0] == W3GS_HEADER_CONSTANT || Bytes[0] == GPS_HEADER_CONSTANT || Bytes[0] == GCBI_HEADER_CONSTANT )
 		{
 			// bytes 2 and 3 contain the length of the packet
 

@@ -39,6 +39,7 @@ class CIncomingAction;
 class CIncomingChatPlayer;
 class CIncomingMapSize;
 class CCallableScoreCheck;
+class CIncomingGarenaPlayer;
 
 class CBaseGame
 {
@@ -85,6 +86,7 @@ protected:
 	map<uint32_t, uint32_t> m_FRSAssists;			// Fate / Another use only. Contains information about player kills
 	uint32_t m_RandomSeed;							// the random seed sent to the Warcraft III clients
 	uint32_t m_HostCounter;							// a unique game number
+	uint32_t m_EntryKey;							// random entry key for LAN, used to prove that a player is actually joining from LAN
 	uint32_t m_Latency;								// the number of ms to wait between sending action packets (we queue any received during this time)
 	uint32_t m_SyncLimit;							// the maximum number of packets a player can fall out of sync before starting the lag screen
 	uint32_t m_SyncCounter;							// the number of actions sent so far (for determining if anyone is lagging)
@@ -173,6 +175,7 @@ public:
 
 	virtual uint32_t GetNextTimedActionTicks( );
 	virtual uint32_t GetSlotsOccupied( );
+	virtual uint32_t GetSlotsAllocated( );
 	virtual uint32_t GetSlotsOpen( );
 	virtual uint32_t GetSlots( );
 	virtual uint32_t GetNumPlayers( );
